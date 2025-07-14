@@ -3,8 +3,6 @@ const SUPABASE_URL = 'https://akgfyvmnlqzwjqvctxhw.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFrZ2Z5dm1ubHF6d2pxdmN0eGh3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI1MDI3NjAsImV4cCI6MjA2ODA3ODc2MH0.WJoBXPp_ApIfTMr0zzdMlCKnmDZSSBD5RxJ7w8pFzgs';
 
 // --- INIZIALIZZAZIONE ---
-// CORREZIONE: Creiamo un client con un nome univoco "supabaseClient"
-// usando l'oggetto globale "supabase" fornito dalla libreria.
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // --- ELEMENTI DEL DOM ---
@@ -20,7 +18,10 @@ const searchButton = document.getElementById('search-button');
 const resultsContainer = document.getElementById('results-container');
 const loadingSpinner = document.getElementById('loading-spinner');
 
-// --- GESTIONE AUTENTICAZIONE ---
+// --- MODIFICA PER LIVE SEARCH: Variabile per il timer di debounce ---
+let debounceTimer;
+
+// --- GESTIONE AUTENTICAZIONE (invariata) ---
 
 function updateUI(user) {
     if (user) {
@@ -36,7 +37,6 @@ loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     loginError.classList.add('hidden');
 
-    // CORREZIONE: usiamo supabaseClient
     const { data, error } = await supabaseClient.auth.signInWithPassword({
         email: loginEmail.value,
         password: loginPassword.value,
@@ -49,30 +49,32 @@ loginForm.addEventListener('submit', async (e) => {
 });
 
 logoutButton.addEventListener('click', async () => {
-    // CORREZIONE: usiamo supabaseClient
     await supabaseClient.auth.signOut();
 });
 
-// CORREZIONE: usiamo supabaseClient
 supabaseClient.auth.onAuthStateChange((event, session) => {
     const user = session?.user;
     updateUI(user);
 });
 
 
-// --- FUNZIONI DI RICERCA ---
+// --- FUNZIONI DI RICERCA (leggermente modificate) ---
 
 async function performSearch() {
     const searchTerm = searchInput.value.trim();
-    if (!searchTerm) {
-        resultsContainer.innerHTML = '<p>Inserisci un termine di ricerca.</p>';
+    
+    // MODIFICA: Non cercare se il campo è troppo corto o vuoto, pulisci i risultati
+    if (searchTerm.length < 2) {
+        resultsContainer.innerHTML = '';
+        loadingSpinner.classList.add('hidden');
         return;
     }
+
     loadingSpinner.classList.remove('hidden');
-    resultsContainer.innerHTML = '';
+    // Non pulire i risultati qui, per un'esperienza più fluida
+    // resultsContainer.innerHTML = ''; 
 
     try {
-        // CORREZIONE: usiamo supabaseClient
         const { data, error } = await supabaseClient
             .from('prodotti')
             .select('*')
@@ -90,11 +92,14 @@ async function performSearch() {
 }
 
 function displayResults(products) {
+    // Prima di mostrare i nuovi risultati, pulisci i vecchi
+    resultsContainer.innerHTML = '';
+
     if (!products || products.length === 0) {
         resultsContainer.innerHTML = '<p>Nessun prodotto trovato.</p>';
         return;
     }
-    resultsContainer.innerHTML = '';
+    
     products.forEach(product => {
         let listinoHtml = `<table class="listino-table"><thead><tr><th>ID Item</th><th>Dimensione</th><th>Prezzo Netto</th></tr></thead><tbody>`;
         product.listino.forEach(item => {
@@ -109,7 +114,18 @@ function displayResults(products) {
     });
 }
 
+// --- MODIFICA: Gestione Eventi per Live Search ---
+
+// Il pulsante "Cerca" ora lancia subito la ricerca, senza debounce
 searchButton.addEventListener('click', performSearch);
-searchInput.addEventListener('keyup', (event) => {
-    if (event.key === 'Enter') performSearch();
+
+// L'evento 'input' sulla barra di ricerca attiva la ricerca con debounce
+searchInput.addEventListener('input', () => {
+    // 1. Cancella il timer precedente ogni volta che l'utente digita
+    clearTimeout(debounceTimer);
+    
+    // 2. Imposta un nuovo timer
+    debounceTimer = setTimeout(() => {
+        performSearch();
+    }, 400); // 400 millisecondi di attesa prima di lanciare la ricerca
 });
