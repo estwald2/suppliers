@@ -3,7 +3,9 @@ const SUPABASE_URL = 'https://akgfyvmnlqzwjqvctxhw.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFrZ2Z5dm1ubHF6d2pxdmN0eGh3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI1MDI3NjAsImV4cCI6MjA2ODA3ODc2MH0.WJoBXPp_ApIfTMr0zzdMlCKnmDZSSBD5RxJ7w8pFzgs';
 
 // --- INIZIALIZZAZIONE ---
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// CORREZIONE: Creiamo un client con un nome univoco "supabaseClient"
+// usando l'oggetto globale "supabase" fornito dalla libreria.
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // --- ELEMENTI DEL DOM ---
 const loginSection = document.getElementById('login-section');
@@ -20,25 +22,22 @@ const loadingSpinner = document.getElementById('loading-spinner');
 
 // --- GESTIONE AUTENTICAZIONE ---
 
-// Funzione per aggiornare l'interfaccia in base allo stato di login
 function updateUI(user) {
     if (user) {
-        // Utente loggato: mostra la ricerca, nascondi il login
         loginSection.classList.add('hidden');
         searchSection.classList.remove('hidden');
     } else {
-        // Utente non loggato: mostra il login, nascondi la ricerca
         loginSection.classList.remove('hidden');
         searchSection.classList.add('hidden');
     }
 }
 
-// Listener per il form di login
 loginForm.addEventListener('submit', async (e) => {
-    e.preventDefault(); // Impedisce il ricaricamento della pagina
-    loginError.classList.add('hidden'); // Nasconde errori precedenti
+    e.preventDefault();
+    loginError.classList.add('hidden');
 
-    const { data, error } = await supabase.auth.signInWithPassword({
+    // CORREZIONE: usiamo supabaseClient
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
         email: loginEmail.value,
         password: loginPassword.value,
     });
@@ -47,23 +46,21 @@ loginForm.addEventListener('submit', async (e) => {
         loginError.textContent = `Errore: ${error.message}`;
         loginError.classList.remove('hidden');
     }
-    // Non c'è bisogno di fare altro, il listener onAuthStateChange si occuperà di aggiornare l'UI
 });
 
-// Listener per il logout
 logoutButton.addEventListener('click', async () => {
-    await supabase.auth.signOut();
-    // il listener onAuthStateChange si occuperà di aggiornare l'UI
+    // CORREZIONE: usiamo supabaseClient
+    await supabaseClient.auth.signOut();
 });
 
-// Listener principale che reagisce ai cambi di stato (login, logout, refresh pagina)
-supabase.auth.onAuthStateChange((event, session) => {
+// CORREZIONE: usiamo supabaseClient
+supabaseClient.auth.onAuthStateChange((event, session) => {
     const user = session?.user;
     updateUI(user);
 });
 
 
-// --- FUNZIONI DI RICERCA (invariate, ma ora funzionano solo se loggati) ---
+// --- FUNZIONI DI RICERCA ---
 
 async function performSearch() {
     const searchTerm = searchInput.value.trim();
@@ -75,7 +72,8 @@ async function performSearch() {
     resultsContainer.innerHTML = '';
 
     try {
-        const { data, error } = await supabase
+        // CORREZIONE: usiamo supabaseClient
+        const { data, error } = await supabaseClient
             .from('prodotti')
             .select('*')
             .ilike('keywords', `%${searchTerm}%`);
@@ -84,7 +82,6 @@ async function performSearch() {
         displayResults(data);
 
     } catch (error) {
-        // Questo errore apparirà se si prova a cercare senza essere l'admin
         resultsContainer.innerHTML = `<p style="color: red;">Errore: ${error.message}</p>`;
         console.error('Errore Supabase:', error);
     } finally {
@@ -97,10 +94,9 @@ function displayResults(products) {
         resultsContainer.innerHTML = '<p>Nessun prodotto trovato.</p>';
         return;
     }
-    resultsContainer.innerHTML = ''; // Pulisci i risultati precedenti
+    resultsContainer.innerHTML = '';
     products.forEach(product => {
-        let listinoHtml = `...`; // La logica per creare la tabella listino è la stessa di prima
-        listinoHtml = `<table class="listino-table"><thead><tr><th>ID Item</th><th>Dimensione</th><th>Prezzo Netto</th></tr></thead><tbody>`;
+        let listinoHtml = `<table class="listino-table"><thead><tr><th>ID Item</th><th>Dimensione</th><th>Prezzo Netto</th></tr></thead><tbody>`;
         product.listino.forEach(item => {
             listinoHtml += `<tr><td>${item.id_item}</td><td>${item.dimensione}</td><td>€ ${item.prezzo_netto.toFixed(2)}</td></tr>`;
         });
