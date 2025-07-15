@@ -23,10 +23,6 @@ const productIdInput = document.getElementById('product-id');
 const listinoTableBody = document.querySelector('#listino-table-editor tbody');
 const addListinoRowButton = document.getElementById('add-listino-row');
 const adminLabel = document.getElementById('admin-label');
-const manageUsersButton = document.getElementById('manage-users-button');
-const userModal = document.getElementById('user-modal');
-const userForm = document.getElementById('user-form');
-const cancelUserButton = document.getElementById('cancel-user-button');
 
 let debounceTimer;
 let currentUserIsAdmin = false;
@@ -224,43 +220,6 @@ function handleEditClick(e) {
     fetchProductAndOpenModal(e.currentTarget.dataset.id);
 }
 
-function openUserModal() {
-    userForm.reset();
-    userModal.classList.remove('hidden');
-}
-
-function closeUserModal() {
-    userModal.classList.add('hidden');
-}
-
-async function handleUserFormSubmit(e) {
-    e.preventDefault();
-    const newUserEmail = document.getElementById('new-user-email').value;
-    const newUserPassword = document.getElementById('new-user-password').value;
-    const PIPEDREAM_WEBHOOK_URL = 'https://xxxxxxxx.m.pipedream.net'; // SOSTITUISCI CON IL TUO URL PIPEDREAM
-
-    if (PIPEDREAM_WEBHOOK_URL.includes('xxxxxxxx')) {
-        alert('Configura l\'URL del webhook di Pipedream in script.js per creare utenti.');
-        return;
-    }
-    
-    try {
-        const response = await fetch(PIPEDREAM_WEBHOOK_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: newUserEmail, password: newUserPassword }),
-        });
-        const result = await response.json();
-        if (!response.ok) {
-            throw new Error(result.msg || 'Errore sconosciuto dal server.');
-        }
-        alert(`Utente ${result.user.email} creato con successo!`);
-        closeUserModal();
-    } catch (error) {
-        alert(`Errore nella creazione dell'utente: ${error.message}`);
-    }
-}
-
 searchButton.addEventListener('click', performSearch);
 searchInput.addEventListener('input', () => {
     clearTimeout(debounceTimer);
@@ -270,6 +229,3 @@ addProductButton.addEventListener('click', () => openModal());
 cancelButton.addEventListener('click', closeModal);
 productForm.addEventListener('submit', handleFormSubmit);
 addListinoRowButton.addEventListener('click', () => addListinoRow());
-manageUsersButton.addEventListener('click', openUserModal);
-cancelUserButton.addEventListener('click', closeUserModal);
-userForm.addEventListener('submit', handleUserFormSubmit);
