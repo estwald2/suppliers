@@ -3,12 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ricerca Prodotti - Area Riservata</title>
+    <title>Gestione Prodotti - Area Riservata</title>
+    <!-- Aggiunto Font Awesome per le icone -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
-        <!-- SEZIONE LOGIN (visibile di default) -->
+        <!-- SEZIONE LOGIN -->
         <div id="login-section">
             <h1>Accesso Area Riservata</h1>
             <form id="login-form">
@@ -19,11 +21,15 @@
             <p id="login-error" class="error-message hidden"></p>
         </div>
 
-        <!-- SEZIONE RICERCA (nascosta di default) -->
+        <!-- SEZIONE RICERCA -->
         <div id="search-section" class="hidden">
             <div class="header">
                 <h1>Ricerca Prodotti</h1>
-                <button id="logout-button">Logout</button>
+                <div>
+                    <!-- Nuovo pulsante "Aggiungi" -->
+                    <button id="add-product-button" class="button-add"><i class="fas fa-plus"></i> Aggiungi Prodotto</button>
+                    <button id="logout-button">Logout</button>
+                </div>
             </div>
             <div class="search-box">
                 <input type="search" id="search-input" placeholder="Cerca valvola, produttore, keyword...">
@@ -34,7 +40,38 @@
         </div>
     </div>
 
-    <!-- Librerie e script -->
+    <!-- NUOVA SEZIONE: Finestra Modale per Aggiungere/Modificare Prodotti -->
+    <div id="product-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h2 id="modal-title">Aggiungi Nuovo Prodotto</h2>
+            <form id="product-form">
+                <input type="hidden" id="product-id">
+                <label for="nome_generico">Nome Generico</label>
+                <input type="text" id="nome_generico" required>
+                
+                <label for="produttore">Produttore</label>
+                <input type="text" id="produttore" required>
+                
+                <label for="fornitore_nome">Nome Fornitore</label>
+                <input type="text" id="fornitore_nome" required>
+
+                <label for="fornitore_email">Email Fornitore</label>
+                <input type="email" id="fornitore_email" required>
+
+                <label for="keywords">Keywords (separate da spazio)</label>
+                <input type="text" id="keywords" required>
+
+                <label for="listino">Listino (in formato JSON)</label>
+                <textarea id="listino" rows="5" placeholder='[{"id_item":"...","dimensione":"...","prezzo_netto":...}]'></textarea>
+
+                <div class="modal-actions">
+                    <button type="submit" class="button-save">Salva</button>
+                    <button type="button" id="cancel-button">Annulla</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="script.js"></script>
 </body>
