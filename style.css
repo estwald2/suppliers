@@ -311,3 +311,57 @@ h3 {
 .modal-actions button { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: 500; }
 .button-save { background-color: var(--primary-color); color: white; }
 #cancel-button { background-color: #ccc; }
+
+/* Stili per la tabella di editing del listino */
+#listino-editor {
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 15px;
+}
+
+#listino-table-editor {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+#listino-table-editor th, #listino-table-editor td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+}
+
+#listino-table-editor th {
+    background-color: #f2f2f2;
+}
+
+#listino-table-editor input[type="text"],
+#listino-table-editor input[type="number"] {
+    width: 100%;
+    padding: 6px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    box-sizing: border-box; /* Importante per non far sforare l'input */
+}
+
+.delete-row-btn {
+    background: none;
+    border: none;
+    color: var(--danger-color);
+    cursor: pointer;
+    font-size: 1.2rem;
+}
+
+.button-add-row {
+    margin-top: 10px;
+    background-color: #e9ecef;
+    color: #495057;
+    border: 1px solid #ced4da;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.button-add-row:hover {
+    background-color: #dee2e6;
+}
