@@ -116,13 +116,26 @@ function displayResults(products) {
                 <button class="action-button delete" data-id="${product.id}"><i class="fas fa-trash"></i></button>
             </div>` : '';
 
+        const imageHTML = product.immagine_url 
+            ? `<img src="${product.immagine_url}" alt="${product.nome_generico}" class="product-image">` 
+            : '';
+
+        const datasheetHTML = product.scheda_tecnica_url 
+            ? `<a href="${product.scheda_tecnica_url}" target="_blank" download class="datasheet-link"><i class="fas fa-file-pdf"></i> Scarica Scheda Tecnica</a>` 
+            : '';
+
         const productCard = document.createElement('div');
         productCard.className = 'product-card';
         productCard.innerHTML = `
             ${actionButtonsHTML}
-            <h2>${product.nome_generico}</h2>
-            <p><strong>Produttore:</strong> ${product.produttore}</p>
-            <p><strong>Fornitore:</strong> ${product.fornitore_nome} (<a href="mailto:${product.fornitore_email}">${product.fornitore_email}</a>)</p>
+            ${imageHTML}
+            <div class="product-details">
+                <h2>${product.nome_generico}</h2>
+                <p><strong>Produttore:</strong> ${product.produttore}</p>
+                <p><strong>Fornitore:</strong> ${product.fornitore_nome} (<a href="mailto:${product.fornitore_email}">${product.fornitore_email}</a>)</p>
+                ${datasheetHTML}
+            </div>
+            <div style="clear: both;"></div>
             <h3>Listino:</h3>
             ${listinoHtml}`;
         resultsContainer.appendChild(productCard);
@@ -144,6 +157,9 @@ function addListinoRow(item = { id_item: '', dimensione: '', prezzo_netto: '' })
 function openModal(product = null) {
     productForm.reset();
     listinoTableBody.innerHTML = '';
+    document.getElementById('immagine-preview').textContent = '';
+    document.getElementById('scheda-tecnica-preview').textContent = '';
+
     if (product) {
         modalTitle.textContent = 'Modifica Prodotto';
         productIdInput.value = product.id;
@@ -152,6 +168,14 @@ function openModal(product = null) {
         document.getElementById('fornitore_nome').value = product.fornitore_nome;
         document.getElementById('fornitore_email').value = product.fornitore_email;
         document.getElementById('keywords').value = product.keywords ? product.keywords.split(' ').join(', ') : '';
+        
+        if (product.immagine_url) {
+            document.getElementById('immagine-preview').textContent = `File attuale: ${product.immagine_url.split('/').pop()}`;
+        }
+        if (product.scheda_tecnica_url) {
+            document.getElementById('scheda-tecnica-preview').textContent = `File attuale: ${product.scheda_tecnica_url.split('/').pop()}`;
+        }
+
         if (product.listino && product.listino.length > 0) {
             product.listino.forEach(item => addListinoRow(item));
         } else {
@@ -169,29 +193,79 @@ function closeModal() {
     productModal.classList.add('hidden');
 }
 
+async function uploadFile(file, bucket, oldUrl = null) {
+    if (!file) return oldUrl;
+
+    const fileName = `${Date.now()}-${file.name.replace(/\s/g, '_')}`;
+    const { error } = await supabaseClient.storage.from(bucket).upload(fileName, file);
+    
+    if (error) {
+        console.error(`Errore nell'upload del file nel bucket ${bucket}:`, error);
+        throw error;
+    }
+    
+    const { data } = supabaseClient.storage.from(bucket).getPublicUrl(fileName);
+    return data.publicUrl;
+}
+
 async function handleFormSubmit(e) {
     e.preventDefault();
     const id = productIdInput.value;
-    const listinoRows = listinoTableBody.querySelectorAll('tr');
-    const listinoJSON = Array.from(listinoRows).map(row => {
-        return { id_item: row.querySelector('.listino-id-item').value, dimensione: row.querySelector('.listino-dimensione').value, prezzo_netto: parseFloat(row.querySelector('.listino-prezzo').value) || 0 };
-    }).filter(item => item.id_item || item.dimensione);
-    const keywordsInput = document.getElementById('keywords').value;
-    const keywordsForDB = keywordsInput.split(',').map(k => k.trim()).filter(k => k).join(' ');
-    const productData = { nome_generico: document.getElementById('nome_generico').value, produttore: document.getElementById('produttore').value, fornitore_nome: document.getElementById('fornitore_nome').value, fornitore_email: document.getElementById('fornitore_email').value, keywords: keywordsForDB, listino: listinoJSON };
-    let error;
-    if (id) {
-        const { error: updateError } = await supabaseClient.from('prodotti').update(productData).eq('id', id);
-        error = updateError;
-    } else {
-        const { error: insertError } = await supabaseClient.from('prodotti').insert([productData]);
-        error = insertError;
-    }
-    if (error) {
-        alert(`Errore: ${error.message}`);
-    } else {
+    const saveButton = e.target.querySelector('.button-save');
+    saveButton.disabled = true;
+    saveButton.textContent = 'Salvataggio...';
+
+    try {
+        const immagineFile = document.getElementById('immagine-upload').files[0];
+        const schedaFile = document.getElementById('scheda-tecnica-upload').files[0];
+        
+        let oldProductData = {};
+        if (id) {
+            const { data } = await supabaseClient.from('prodotti').select('immagine_url, scheda_tecnica_url').eq('id', id).single();
+            oldProductData = data || {};
+        }
+
+        const immagine_url = await uploadFile(immagineFile, 'immagini-prodotti', oldProductData.immagine_url);
+        const scheda_tecnica_url = await uploadFile(schedaFile, 'schede-tecniche', oldProductData.scheda_tecnica_url);
+
+        const listinoRows = listinoTableBody.querySelectorAll('tr');
+        const listinoJSON = Array.from(listinoRows).map(row => {
+            return { id_item: row.querySelector('.listino-id-item').value, dimensione: row.querySelector('.listino-dimensione').value, prezzo_netto: parseFloat(row.querySelector('.listino-prezzo').value) || 0 };
+        }).filter(item => item.id_item || item.dimensione);
+        
+        const keywordsInput = document.getElementById('keywords').value;
+        const keywordsForDB = keywordsInput.split(',').map(k => k.trim()).filter(k => k).join(' ');
+        
+        const productData = {
+            nome_generico: document.getElementById('nome_generico').value,
+            produttore: document.getElementById('produttore').value,
+            fornitore_nome: document.getElementById('fornitore_nome').value,
+            fornitore_email: document.getElementById('fornitore_email').value,
+            keywords: keywordsForDB,
+            listino: listinoJSON,
+            immagine_url: immagine_url,
+            scheda_tecnica_url: scheda_tecnica_url,
+        };
+
+        let error;
+        if (id) {
+            const { error: updateError } = await supabaseClient.from('prodotti').update(productData).eq('id', id);
+            error = updateError;
+        } else {
+            const { error: insertError } = await supabaseClient.from('prodotti').insert([productData]);
+            error = insertError;
+        }
+
+        if (error) throw error;
+
         closeModal();
         performSearch();
+
+    } catch (error) {
+        alert(`Errore durante il salvataggio: ${error.message}`);
+    } finally {
+        saveButton.disabled = false;
+        saveButton.textContent = 'Salva';
     }
 }
 
@@ -207,6 +281,18 @@ async function fetchProductAndOpenModal(id) {
 async function handleDeleteClick(e) {
     const id = e.currentTarget.dataset.id;
     if (confirm('Sei sicuro di voler eliminare questo prodotto?')) {
+        const { data: product } = await supabaseClient.from('prodotti').select('immagine_url, scheda_tecnica_url').eq('id', id).single();
+        if (product) {
+            if (product.immagine_url) {
+                const fileName = product.immagine_url.split('/').pop();
+                await supabaseClient.storage.from('immagini-prodotti').remove([fileName]);
+            }
+            if (product.scheda_tecnica_url) {
+                const fileName = product.scheda_tecnica_url.split('/').pop();
+                await supabaseClient.storage.from('schede-tecniche').remove([fileName]);
+            }
+        }
+        
         const { error } = await supabaseClient.from('prodotti').delete().eq('id', id);
         if (error) {
             alert(`Errore durante l'eliminazione: ${error.message}`);
