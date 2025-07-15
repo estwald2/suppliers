@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-    <meta charset="UTF--8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestione Prodotti - Area Riservata</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
@@ -24,7 +24,6 @@
                 <h1>Ricerca Prodotti</h1>
                 <div>
                     <span id="admin-label" class="admin-badge admin-only" style="display: none;">Admin</span>
-                    <button id="manage-users-button" class="button-manage admin-only" style="display: none;"><i class="fas fa-users"></i> Gestisci Utenti</button>
                     <button id="add-product-button" class="button-add admin-only" style="display: none;"><i class="fas fa-plus"></i> Aggiungi Prodotto</button>
                     <button id="logout-button">Logout</button>
                 </div>
@@ -78,24 +77,6 @@
                 <div class="modal-actions">
                     <button type="submit" class="button-save">Salva</button>
                     <button type="button" id="cancel-button">Annulla</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <div id="user-modal" class="modal-overlay hidden">
-        <div class="modal-content">
-            <h2 id="user-modal-title">Aggiungi Nuovo Utente</h2>
-            <form id="user-form">
-                <label for="new-user-email">Email Utente</label>
-                <input type="email" id="new-user-email" required>
-                
-                <label for="new-user-password">Password Provvisoria</label>
-                <input type="password" id="new-user-password" required>
-
-                <div class="modal-actions">
-                    <button type="submit" class="button-save">Crea Utente</button>
-                    <button type="button" id="cancel-user-button">Annulla</button>
                 </div>
             </form>
         </div>
