@@ -23,6 +23,12 @@ const productIdInput = document.getElementById('product-id');
 const listinoTableBody = document.querySelector('#listino-table-editor tbody');
 const addListinoRowButton = document.getElementById('add-listino-row');
 const adminLabel = document.getElementById('admin-label');
+const recommendedContainer = document.getElementById('recommended-products-container');
+const recommendedDiv = document.getElementById('recommended-products');
+const alternativeContainer = document.getElementById('alternative-products-container');
+const alternativeDiv = document.getElementById('alternative-products');
+const productTypeRadios = document.querySelectorAll('input[name="product_type"]');
+const livelloConsigliatoWrapper = document.getElementById('livello-consigliato-wrapper');
 
 let debounceTimer;
 let currentUserIsAdmin = false;
@@ -79,6 +85,8 @@ async function performSearch() {
     const searchTerm = searchInput.value.trim();
     if (searchTerm.length === 0) {
         resultsContainer.innerHTML = '';
+        recommendedContainer.classList.add('hidden');
+        alternativeContainer.classList.add('hidden');
         loadingSpinner.classList.add('hidden');
         return;
     }
@@ -95,12 +103,23 @@ async function performSearch() {
 }
 
 function displayResults(products) {
-    resultsContainer.innerHTML = '';
-    if (!products || products.length === 0) {
+    recommendedDiv.innerHTML = '';
+    alternativeDiv.innerHTML = '';
+
+    const recommendedProducts = products.filter(p => p.consigliato);
+    const alternativeProducts = products.filter(p => !p.consigliato);
+
+    recommendedContainer.classList.toggle('hidden', recommendedProducts.length === 0);
+    alternativeContainer.classList.toggle('hidden', alternativeProducts.length === 0);
+
+    const noResultsMsg = document.querySelector('#results-container > p');
+    if (noResultsMsg) noResultsMsg.remove();
+    if (products.length === 0) {
         resultsContainer.innerHTML = '<p>Nessun prodotto trovato.</p>';
         return;
     }
-    products.forEach(product => {
+
+    const processProduct = (product, container) => {
         let listinoHtml = `<table class="listino-table"><thead><tr><th>ID Item</th><th>Dimensione</th><th>Prezzo Netto</th></tr></thead><tbody>`;
         if (product.listino) {
             product.listino.forEach(item => {
@@ -110,23 +129,15 @@ function displayResults(products) {
         }
         listinoHtml += '</tbody></table>';
 
-        const actionButtonsHTML = currentUserIsAdmin ? `
-            <div class="product-actions admin-only">
-                <button class="action-button edit" data-id="${product.id}"><i class="fas fa-pencil-alt"></i></button>
-                <button class="action-button delete" data-id="${product.id}"><i class="fas fa-trash"></i></button>
-            </div>` : '';
-
-        const imageHTML = product.immagine_url 
-            ? `<img src="${product.immagine_url}" alt="${product.nome_generico}" class="product-image">` 
-            : '';
-
-        const datasheetHTML = product.scheda_tecnica_url 
-            ? `<a href="${product.scheda_tecnica_url}" target="_blank" download class="datasheet-link"><i class="fas fa-file-pdf"></i> Scarica Scheda Tecnica</a>` 
-            : '';
+        const actionButtonsHTML = currentUserIsAdmin ? `<div class="product-actions"><button class="action-button edit" data-id="${product.id}"><i class="fas fa-pencil-alt"></i></button><button class="action-button delete" data-id="${product.id}"><i class="fas fa-trash"></i></button></div>` : '';
+        const imageHTML = product.immagine_url ? `<img src="${product.immagine_url}" alt="${product.nome_generico}" class="product-image">` : '';
+        const datasheetHTML = product.scheda_tecnica_url ? `<a href="${product.scheda_tecnica_url}?download=" download="${product.nome_generico}_scheda.pdf" class="datasheet-link"><i class="fas fa-file-pdf"></i> Scarica Scheda Tecnica</a>` : '';
+        const badgeHTML = product.consigliato && product.tipo_consigliato ? `<span class="product-badge ${product.tipo_consigliato}">${product.tipo_consigliato.charAt(0).toUpperCase() + product.tipo_consigliato.slice(1)}</span>` : '';
 
         const productCard = document.createElement('div');
         productCard.className = 'product-card';
         productCard.innerHTML = `
+            ${badgeHTML}
             ${actionButtonsHTML}
             ${imageHTML}
             <div class="product-details">
@@ -138,8 +149,11 @@ function displayResults(products) {
             <div style="clear: both;"></div>
             <h3>Listino:</h3>
             ${listinoHtml}`;
-        resultsContainer.appendChild(productCard);
-    });
+        container.appendChild(productCard);
+    };
+
+    recommendedProducts.forEach(product => processProduct(product, recommendedDiv));
+    alternativeProducts.forEach(product => processProduct(product, alternativeDiv));
 
     if (currentUserIsAdmin) {
         document.querySelectorAll('.action-button.edit').forEach(button => button.addEventListener('click', handleEditClick));
@@ -169,6 +183,15 @@ function openModal(product = null) {
         document.getElementById('fornitore_email').value = product.fornitore_email;
         document.getElementById('keywords').value = product.keywords ? product.keywords.split(' ').join(', ') : '';
         
+        if (product.consigliato) {
+            document.getElementById('tipo-consigliato').checked = true;
+            livelloConsigliatoWrapper.style.display = 'block';
+            document.getElementById('livello-consigliato').value = product.tipo_consigliato || 'premium';
+        } else {
+            document.getElementById('tipo-alternativa').checked = true;
+            livelloConsigliatoWrapper.style.display = 'none';
+        }
+        
         if (product.immagine_url) {
             document.getElementById('immagine-preview').textContent = `File attuale: ${product.immagine_url.split('/').pop()}`;
         }
@@ -184,6 +207,9 @@ function openModal(product = null) {
     } else {
         modalTitle.textContent = 'Aggiungi Nuovo Prodotto';
         productIdInput.value = '';
+        document.getElementById('tipo-consigliato').checked = true;
+        livelloConsigliatoWrapper.style.display = 'block';
+        document.getElementById('livello-consigliato').value = 'premium';
         addListinoRow();
     }
     productModal.classList.remove('hidden');
@@ -195,15 +221,12 @@ function closeModal() {
 
 async function uploadFile(file, bucket, oldUrl = null) {
     if (!file) return oldUrl;
-
     const fileName = `${Date.now()}-${file.name.replace(/\s/g, '_')}`;
     const { error } = await supabaseClient.storage.from(bucket).upload(fileName, file);
-    
     if (error) {
         console.error(`Errore nell'upload del file nel bucket ${bucket}:`, error);
         throw error;
     }
-    
     const { data } = supabaseClient.storage.from(bucket).getPublicUrl(fileName);
     return data.publicUrl;
 }
@@ -226,7 +249,7 @@ async function handleFormSubmit(e) {
         }
 
         const immagine_url = await uploadFile(immagineFile, 'immagini-prodotti', oldProductData.immagine_url);
-        const scheda_tecnica_url = await uploadFile(schedaFile, 'schede-tecniche', oldProductData.scheda_tecnica_url);
+        const scheda_tecnica_url = await uploadFile(schedeFile, 'schede-tecniche', oldProductData.scheda_tecnica_url);
 
         const listinoRows = listinoTableBody.querySelectorAll('tr');
         const listinoJSON = Array.from(listinoRows).map(row => {
@@ -236,6 +259,9 @@ async function handleFormSubmit(e) {
         const keywordsInput = document.getElementById('keywords').value;
         const keywordsForDB = keywordsInput.split(',').map(k => k.trim()).filter(k => k).join(' ');
         
+        const isConsigliato = document.getElementById('tipo-consigliato').checked;
+        const tipoConsigliatoValue = isConsigliato ? document.getElementById('livello-consigliato').value : null;
+
         const productData = {
             nome_generico: document.getElementById('nome_generico').value,
             produttore: document.getElementById('produttore').value,
@@ -245,6 +271,8 @@ async function handleFormSubmit(e) {
             listino: listinoJSON,
             immagine_url: immagine_url,
             scheda_tecnica_url: scheda_tecnica_url,
+            consigliato: isConsigliato,
+            tipo_consigliato: tipoConsigliatoValue,
         };
 
         let error;
@@ -315,3 +343,8 @@ addProductButton.addEventListener('click', () => openModal());
 cancelButton.addEventListener('click', closeModal);
 productForm.addEventListener('submit', handleFormSubmit);
 addListinoRowButton.addEventListener('click', () => addListinoRow());
+productTypeRadios.forEach(radio => {
+    radio.addEventListener('change', (e) => {
+        livelloConsigliatoWrapper.style.display = e.target.value === 'consigliato' ? 'block' : 'none';
+    });
+});
