@@ -3,7 +3,6 @@ const SUPABASE_URL = 'https://akgfyvmnlqzwjqvctxhw.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFrZ2Z5dm1ubHF6d2pxdmN0eGh3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI1MDI3NjAsImV4cCI6MjA2ODA3ODc2MH0.WJoBXPp_ApIfTMr0zzdMlCKnmDZSSBD5RxJ7w8pFzgs';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// --- ELEMENTI DEL DOM (invariati) ---
 const loginSection = document.getElementById('login-section');
 const searchSection = document.getElementById('search-section');
 const loginForm = document.getElementById('login-form');
@@ -34,12 +33,12 @@ const livelloConsigliatoWrapper = document.getElementById('livello-consigliato-w
 
 let currentUserIsAdmin = false;
 
-// --- GESTIONE AUTENTICAZIONE E RUOLI (invariata) ---
 async function checkAdminStatus() {
     const { data, error } = await supabaseClient.rpc('is_admin');
     if (error) { console.error("Errore nel verificare lo stato di admin:", error); return false; }
     return data;
 }
+
 async function updateUI(user) {
     if (user) {
         loginSection.classList.add('hidden');
@@ -57,11 +56,13 @@ async function updateUI(user) {
         });
     }
 }
+
 supabaseClient.auth.onAuthStateChange((event, session) => { updateUI(session?.user); });
+
 loginForm.addEventListener('submit', async (e) => { e.preventDefault(); loginError.classList.add('hidden'); const { data, error } = await supabaseClient.auth.signInWithPassword({ email: loginEmail.value, password: loginPassword.value, }); if (error) { loginError.textContent = `Errore: ${error.message}`; loginError.classList.remove('hidden'); } });
+
 logoutButton.addEventListener('click', async () => { await supabaseClient.auth.signOut(); });
 
-// --- FUNZIONI DI RICERCA (MODIFICATA) ---
 async function performSearch() {
     const searchTerm = searchInput.value.trim();
     if (searchTerm.length === 0) {
@@ -76,12 +77,15 @@ async function performSearch() {
     loadingSpinner.classList.remove('hidden');
     noResultsMessage.classList.add('hidden');
     try {
-        // MODIFICA: La query ora cerca nell'array di keyword.
-        // array_to_string converte l'array in una singola stringa per la ricerca ilike.
+        const searchPattern = `%${searchTerm}%`;
         const { data, error } = await supabaseClient
             .from('prodotti')
             .select('*')
-            .ilike('keywords_ts', `%${searchTerm}%`); // Usiamo la colonna generata `keywords_ts`
+            .or(
+                `nome_generico.ilike.${searchPattern},` +
+                `produttore.ilike.${searchPattern},` +
+                `array_to_string(keywords, ' ').ilike.${searchPattern}`
+            );
 
         if (error) throw error;
         displayResults(data);
@@ -92,8 +96,6 @@ async function performSearch() {
     }
 }
 
-
-// --- FUNZIONE DI VISUALIZZAZIONE (invariata) ---
 function displayResults(products) {
     recommendedDiv.innerHTML = '';
     alternativeDiv.innerHTML = '';
@@ -121,8 +123,6 @@ function displayResults(products) {
     if (currentUserIsAdmin) { document.querySelectorAll('.action-button.edit').forEach(button => button.addEventListener('click', handleEditClick)); document.querySelectorAll('.action-button.delete').forEach(button => button.addEventListener('click', handleDeleteClick)); }
 }
 
-
-// --- LOGICA CRUD (MODIFICATA) ---
 function openModal(product = null) {
     productForm.reset();
     listinoTableBody.innerHTML = '';
@@ -135,7 +135,6 @@ function openModal(product = null) {
         document.getElementById('produttore').value = product.produttore;
         document.getElementById('fornitore_nome').value = product.fornitore_nome;
         document.getElementById('fornitore_email').value = product.fornitore_email;
-        // MODIFICA: L'array di keyword viene unito con ", " per la visualizzazione.
         document.getElementById('keywords').value = product.keywords ? product.keywords.join(', ') : '';
         if (product.consigliato) { document.getElementById('tipo-consigliato').checked = true; livelloConsigliatoWrapper.style.display = 'block'; document.getElementById('livello-consigliato').value = product.tipo_consigliato || 'premium'; } else { document.getElementById('tipo-alternativa').checked = true; livelloConsigliatoWrapper.style.display = 'none'; }
         if (product.immagine_url) { document.getElementById('immagine-preview').textContent = `File attuale: ${product.immagine_url.split('/').pop()}`; }
@@ -168,7 +167,6 @@ async function handleFormSubmit(e) {
         const listinoRows = listinoTableBody.querySelectorAll('tr');
         const listinoJSON = Array.from(listinoRows).map(row => ({ id_item: row.querySelector('.listino-id-item').value, dimensione: row.querySelector('.listino-dimensione').value, prezzo_netto: parseFloat(row.querySelector('.listino-prezzo').value) || 0 })).filter(item => item.id_item || item.dimensione);
         
-        // MODIFICA: La stringa di input viene divisa per virgola e ripulita per creare l'array.
         const keywordsInput = document.getElementById('keywords').value;
         const keywordsForDB = keywordsInput.split(',').map(k => k.trim()).filter(k => k);
 
@@ -188,7 +186,6 @@ async function handleFormSubmit(e) {
     }
 }
 
-// --- FUNZIONI HELPER (invariate) ---
 function addListinoRow(item = { id_item: '', dimensione: '', prezzo_netto: '' }) { const row = document.createElement('tr'); row.innerHTML = `<td><input type="text" class="listino-id-item" value="${item.id_item || ''}" required></td><td><input type="text" class="listino-dimensione" value="${item.dimensione || ''}" required></td><td><input type="number" step="0.01" class="listino-prezzo" value="${item.prezzo_netto || ''}" required></td><td><button type="button" class="delete-row-btn"><i class="fas fa-trash"></i></button></td>`; listinoTableBody.appendChild(row); row.querySelector('.delete-row-btn').addEventListener('click', () => row.remove()); }
 function closeModal() { productModal.classList.add('hidden'); }
 async function uploadFile(file, bucket) { const fileName = `${Date.now()}-${file.name.replace(/\s/g, '_')}`; const { error } = await supabaseClient.storage.from(bucket).upload(fileName, file); if (error) { console.error(`Errore nell'upload del file nel bucket ${bucket}:`, error); throw error; } const { data } = supabaseClient.storage.from(bucket).getPublicUrl(fileName); return data.publicUrl; }
@@ -196,7 +193,6 @@ async function fetchProductAndOpenModal(id) { const { data, error } = await supa
 async function handleDeleteClick(e) { const id = e.currentTarget.dataset.id; if (confirm('Sei sicuro di voler eliminare questo prodotto? L\'azione è irreversibile.')) { const { data: product } = await supabaseClient.from('prodotti').select('immagine_url, scheda_tecnica_url').eq('id', id).single(); const { error } = await supabaseClient.from('prodotti').delete().eq('id', id); if (error) { alert(`Errore durante l'eliminazione del record dal database: ${error.message}`); return; } if (product) { if (product.immagine_url) { const fileName = product.immagine_url.split('/').pop(); await supabaseClient.storage.from('immagini-prodotti').remove([fileName]); } if (product.scheda_tecnica_url) { const fileName = product.scheda_tecnica_url.split('/').pop(); await supabaseClient.storage.from('schede-tecniche').remove([fileName]); } } performSearch(); } }
 function handleEditClick(e) { fetchProductAndOpenModal(e.currentTarget.dataset.id); }
 
-// --- EVENT LISTENERS ---
 searchButton.addEventListener('click', performSearch);
 searchInput.addEventListener('input', performSearch);
 addProductButton.addEventListener('click', () => openModal());
