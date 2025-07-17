@@ -33,7 +33,17 @@
                 <button id="search-button">Cerca</button>
             </div>
             <div id="loading-spinner" class="hidden"></div>
-            <div id="results-container"></div>
+            
+            <div id="results-container">
+                <div id="recommended-products-container" class="hidden">
+                    <h3>Prodotti Consigliati</h3>
+                    <div id="recommended-products"></div>
+                </div>
+                <div id="alternative-products-container" class="hidden">
+                    <h3>Alternative</h3>
+                    <div id="alternative-products"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -56,6 +66,22 @@
 
                 <label for="keywords">Keywords (separate da virgola)</label>
                 <input type="text" id="keywords" required placeholder="valvola, ottone, riscaldamento">
+
+                <label>Tipologia Prodotto</label>
+                <div class="radio-group">
+                    <input type="radio" id="tipo-consigliato" name="product_type" value="consigliato" checked>
+                    <label for="tipo-consigliato">Consigliato</label>
+                    <input type="radio" id="tipo-alternativa" name="product_type" value="alternativa">
+                    <label for="tipo-alternativa">Alternativa</label>
+                </div>
+                
+                <div id="livello-consigliato-wrapper">
+                    <label for="livello-consigliato">Livello Prodotto Consigliato</label>
+                    <select id="livello-consigliato">
+                        <option value="premium">Premium</option>
+                        <option value="economico">Economico</option>
+                    </select>
+                </div>
 
                 <label for="immagine-upload">Immagine Prodotto (JPG, PNG)</label>
                 <input type="file" id="immagine-upload" accept="image/jpeg, image/png">
