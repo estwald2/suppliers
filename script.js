@@ -27,10 +27,10 @@ const recommendedContainer = document.getElementById('recommended-products-conta
 const recommendedDiv = document.getElementById('recommended-products');
 const alternativeContainer = document.getElementById('alternative-products-container');
 const alternativeDiv = document.getElementById('alternative-products');
+const noResultsMessage = document.getElementById('no-results-message');
 const productTypeRadios = document.querySelectorAll('input[name="product_type"]');
 const livelloConsigliatoWrapper = document.getElementById('livello-consigliato-wrapper');
 
-let debounceTimer;
 let currentUserIsAdmin = false;
 
 async function checkAdminStatus() {
@@ -84,13 +84,16 @@ logoutButton.addEventListener('click', async () => {
 async function performSearch() {
     const searchTerm = searchInput.value.trim();
     if (searchTerm.length === 0) {
-        resultsContainer.innerHTML = '';
+        recommendedDiv.innerHTML = '';
+        alternativeDiv.innerHTML = '';
         recommendedContainer.classList.add('hidden');
         alternativeContainer.classList.add('hidden');
+        noResultsMessage.classList.add('hidden');
         loadingSpinner.classList.add('hidden');
         return;
     }
     loadingSpinner.classList.remove('hidden');
+    noResultsMessage.classList.add('hidden');
     try {
         const { data, error } = await supabaseClient.from('prodotti').select('*').ilike('keywords', `%${searchTerm}%`);
         if (error) throw error;
@@ -105,16 +108,22 @@ async function performSearch() {
 function displayResults(products) {
     recommendedDiv.innerHTML = '';
     alternativeDiv.innerHTML = '';
-    const recommendedProducts = products.filter(p => p.consigliato);
-    const alternativeProducts = products.filter(p => !p.consigliato);
-    recommendedContainer.classList.toggle('hidden', recommendedProducts.length === 0);
-    alternativeContainer.classList.toggle('hidden', alternativeProducts.length === 0);
-    const noResultsMsg = document.querySelector('#results-container > p');
-    if (noResultsMsg) noResultsMsg.remove();
+    
     if (products.length === 0) {
-        resultsContainer.innerHTML = '<p>Nessun prodotto trovato.</p>';
+        recommendedContainer.classList.add('hidden');
+        alternativeContainer.classList.add('hidden');
+        noResultsMessage.classList.remove('hidden');
         return;
     }
+    
+    noResultsMessage.classList.add('hidden');
+
+    const recommendedProducts = products.filter(p => p.consigliato);
+    const alternativeProducts = products.filter(p => !p.consigliato);
+
+    recommendedContainer.classList.toggle('hidden', recommendedProducts.length === 0);
+    alternativeContainer.classList.toggle('hidden', alternativeProducts.length === 0);
+
     const processProduct = (product, container) => {
         let listinoHtml = `<table class="listino-table"><thead><tr><th>ID Item</th><th>Dimensione</th><th>Prezzo Netto</th></tr></thead><tbody>`;
         if (product.listino) {
@@ -130,11 +139,25 @@ function displayResults(products) {
         const badgeHTML = product.consigliato && product.tipo_consigliato ? `<span class="product-badge ${product.tipo_consigliato}">${product.tipo_consigliato.charAt(0).toUpperCase() + product.tipo_consigliato.slice(1)}</span>` : '';
         const productCard = document.createElement('div');
         productCard.className = 'product-card';
-        productCard.innerHTML = `${badgeHTML}${actionButtonsHTML}${imageHTML}<div class="product-details"><h2>${product.nome_generico}</h2><p><strong>Produttore:</strong> ${product.produttore}</p><p><strong>Fornitore:</strong> ${product.fornitore_nome} (<a href="mailto:${product.fornitore_email}">${product.fornitore_email}</a>)</p>${datasheetHTML}</div><div style="clear: both;"></div><h3>Listino:</h3>${listinoHtml}`;
+        productCard.innerHTML = `
+            ${badgeHTML}
+            ${actionButtonsHTML}
+            ${imageHTML}
+            <div class="product-details">
+                <h2>${product.nome_generico}</h2>
+                <p><strong>Produttore:</strong> ${product.produttore}</p>
+                <p><strong>Fornitore:</strong> ${product.fornitore_nome} (<a href="mailto:${product.fornitore_email}">${product.fornitore_email}</a>)</p>
+                ${datasheetHTML}
+            </div>
+            <div style="clear: both;"></div>
+            <h3>Listino:</h3>
+            ${listinoHtml}`;
         container.appendChild(productCard);
     };
+
     recommendedProducts.forEach(product => processProduct(product, recommendedDiv));
     alternativeProducts.forEach(product => processProduct(product, alternativeDiv));
+
     if (currentUserIsAdmin) {
         document.querySelectorAll('.action-button.edit').forEach(button => button.addEventListener('click', handleEditClick));
         document.querySelectorAll('.action-button.delete').forEach(button => button.addEventListener('click', handleDeleteClick));
@@ -280,14 +303,11 @@ async function handleDeleteClick(e) {
     const id = e.currentTarget.dataset.id;
     if (confirm('Sei sicuro di voler eliminare questo prodotto? L\'azione è irreversibile.')) {
         const { data: product } = await supabaseClient.from('prodotti').select('immagine_url, scheda_tecnica_url').eq('id', id).single();
-        
         const { error } = await supabaseClient.from('prodotti').delete().eq('id', id);
-        
         if (error) {
             alert(`Errore durante l'eliminazione del record dal database: ${error.message}`);
             return;
         }
-
         if (product) {
             if (product.immagine_url) {
                 const fileName = product.immagine_url.split('/').pop();
@@ -298,7 +318,6 @@ async function handleDeleteClick(e) {
                 await supabaseClient.storage.from('schede-tecniche').remove([fileName]);
             }
         }
-        
         performSearch();
     }
 }
@@ -308,10 +327,7 @@ function handleEditClick(e) {
 }
 
 searchButton.addEventListener('click', performSearch);
-searchInput.addEventListener('input', () => {
-    clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(performSearch, 400);
-});
+searchInput.addEventListener('input', performSearch);
 addProductButton.addEventListener('click', () => openModal());
 cancelButton.addEventListener('click', closeModal);
 productForm.addEventListener('submit', handleFormSubmit);
