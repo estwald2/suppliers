@@ -105,20 +105,16 @@ async function performSearch() {
 function displayResults(products) {
     recommendedDiv.innerHTML = '';
     alternativeDiv.innerHTML = '';
-
     const recommendedProducts = products.filter(p => p.consigliato);
     const alternativeProducts = products.filter(p => !p.consigliato);
-
     recommendedContainer.classList.toggle('hidden', recommendedProducts.length === 0);
     alternativeContainer.classList.toggle('hidden', alternativeProducts.length === 0);
-
     const noResultsMsg = document.querySelector('#results-container > p');
     if (noResultsMsg) noResultsMsg.remove();
     if (products.length === 0) {
         resultsContainer.innerHTML = '<p>Nessun prodotto trovato.</p>';
         return;
     }
-
     const processProduct = (product, container) => {
         let listinoHtml = `<table class="listino-table"><thead><tr><th>ID Item</th><th>Dimensione</th><th>Prezzo Netto</th></tr></thead><tbody>`;
         if (product.listino) {
@@ -128,33 +124,17 @@ function displayResults(products) {
             });
         }
         listinoHtml += '</tbody></table>';
-
         const actionButtonsHTML = currentUserIsAdmin ? `<div class="product-actions"><button class="action-button edit" data-id="${product.id}"><i class="fas fa-pencil-alt"></i></button><button class="action-button delete" data-id="${product.id}"><i class="fas fa-trash"></i></button></div>` : '';
         const imageHTML = product.immagine_url ? `<img src="${product.immagine_url}" alt="${product.nome_generico}" class="product-image">` : '';
         const datasheetHTML = product.scheda_tecnica_url ? `<a href="${product.scheda_tecnica_url}?download=" download="${product.nome_generico}_scheda.pdf" class="datasheet-link"><i class="fas fa-file-pdf"></i> Scarica Scheda Tecnica</a>` : '';
         const badgeHTML = product.consigliato && product.tipo_consigliato ? `<span class="product-badge ${product.tipo_consigliato}">${product.tipo_consigliato.charAt(0).toUpperCase() + product.tipo_consigliato.slice(1)}</span>` : '';
-
         const productCard = document.createElement('div');
         productCard.className = 'product-card';
-        productCard.innerHTML = `
-            ${badgeHTML}
-            ${actionButtonsHTML}
-            ${imageHTML}
-            <div class="product-details">
-                <h2>${product.nome_generico}</h2>
-                <p><strong>Produttore:</strong> ${product.produttore}</p>
-                <p><strong>Fornitore:</strong> ${product.fornitore_nome} (<a href="mailto:${product.fornitore_email}">${product.fornitore_email}</a>)</p>
-                ${datasheetHTML}
-            </div>
-            <div style="clear: both;"></div>
-            <h3>Listino:</h3>
-            ${listinoHtml}`;
+        productCard.innerHTML = `${badgeHTML}${actionButtonsHTML}${imageHTML}<div class="product-details"><h2>${product.nome_generico}</h2><p><strong>Produttore:</strong> ${product.produttore}</p><p><strong>Fornitore:</strong> ${product.fornitore_nome} (<a href="mailto:${product.fornitore_email}">${product.fornitore_email}</a>)</p>${datasheetHTML}</div><div style="clear: both;"></div><h3>Listino:</h3>${listinoHtml}`;
         container.appendChild(productCard);
     };
-
     recommendedProducts.forEach(product => processProduct(product, recommendedDiv));
     alternativeProducts.forEach(product => processProduct(product, alternativeDiv));
-
     if (currentUserIsAdmin) {
         document.querySelectorAll('.action-button.edit').forEach(button => button.addEventListener('click', handleEditClick));
         document.querySelectorAll('.action-button.delete').forEach(button => button.addEventListener('click', handleDeleteClick));
@@ -173,7 +153,6 @@ function openModal(product = null) {
     listinoTableBody.innerHTML = '';
     document.getElementById('immagine-preview').textContent = '';
     document.getElementById('scheda-tecnica-preview').textContent = '';
-
     if (product) {
         modalTitle.textContent = 'Modifica Prodotto';
         productIdInput.value = product.id;
@@ -182,7 +161,6 @@ function openModal(product = null) {
         document.getElementById('fornitore_nome').value = product.fornitore_nome;
         document.getElementById('fornitore_email').value = product.fornitore_email;
         document.getElementById('keywords').value = product.keywords ? product.keywords.split(' ').join(', ') : '';
-        
         if (product.consigliato) {
             document.getElementById('tipo-consigliato').checked = true;
             livelloConsigliatoWrapper.style.display = 'block';
@@ -191,14 +169,12 @@ function openModal(product = null) {
             document.getElementById('tipo-alternativa').checked = true;
             livelloConsigliatoWrapper.style.display = 'none';
         }
-        
         if (product.immagine_url) {
             document.getElementById('immagine-preview').textContent = `File attuale: ${product.immagine_url.split('/').pop()}`;
         }
         if (product.scheda_tecnica_url) {
             document.getElementById('scheda-tecnica-preview').textContent = `File attuale: ${product.scheda_tecnica_url.split('/').pop()}`;
         }
-
         if (product.listino && product.listino.length > 0) {
             product.listino.forEach(item => addListinoRow(item));
         } else {
@@ -219,8 +195,7 @@ function closeModal() {
     productModal.classList.add('hidden');
 }
 
-async function uploadFile(file, bucket, oldUrl = null) {
-    if (!file) return oldUrl;
+async function uploadFile(file, bucket) {
     const fileName = `${Date.now()}-${file.name.replace(/\s/g, '_')}`;
     const { error } = await supabaseClient.storage.from(bucket).upload(fileName, file);
     if (error) {
@@ -244,21 +219,18 @@ async function handleFormSubmit(e) {
         
         let oldProductData = {};
         if (id) {
-            const { data } = await supabaseClient.from('prodotti').select('immagine_url, scheda_tecnica_url').eq('id', id).single();
+            const { data, error } = await supabaseClient.from('prodotti').select('immagine_url, scheda_tecnica_url').eq('id', id).single();
+            if (error) throw new Error("Impossibile recuperare i dati del prodotto esistente.");
             oldProductData = data || {};
         }
 
-        const immagine_url = await uploadFile(immagineFile, 'immagini-prodotti', oldProductData.immagine_url);
-        const scheda_tecnica_url = await uploadFile(schedeFile, 'schede-tecniche', oldProductData.scheda_tecnica_url);
+        const immagine_url = immagineFile ? await uploadFile(immagineFile, 'immagini-prodotti') : oldProductData.immagine_url;
+        const scheda_tecnica_url = schedaFile ? await uploadFile(schedaFile, 'schede-tecniche') : oldProductData.scheda_tecnica_url;
 
         const listinoRows = listinoTableBody.querySelectorAll('tr');
-        const listinoJSON = Array.from(listinoRows).map(row => {
-            return { id_item: row.querySelector('.listino-id-item').value, dimensione: row.querySelector('.listino-dimensione').value, prezzo_netto: parseFloat(row.querySelector('.listino-prezzo').value) || 0 };
-        }).filter(item => item.id_item || item.dimensione);
-        
+        const listinoJSON = Array.from(listinoRows).map(row => ({ id_item: row.querySelector('.listino-id-item').value, dimensione: row.querySelector('.listino-dimensione').value, prezzo_netto: parseFloat(row.querySelector('.listino-prezzo').value) || 0 })).filter(item => item.id_item || item.dimensione);
         const keywordsInput = document.getElementById('keywords').value;
         const keywordsForDB = keywordsInput.split(',').map(k => k.trim()).filter(k => k).join(' ');
-        
         const isConsigliato = document.getElementById('tipo-consigliato').checked;
         const tipoConsigliatoValue = isConsigliato ? document.getElementById('livello-consigliato').value : null;
 
@@ -275,20 +247,18 @@ async function handleFormSubmit(e) {
             tipo_consigliato: tipoConsigliatoValue,
         };
 
-        let error;
+        let dbError;
         if (id) {
-            const { error: updateError } = await supabaseClient.from('prodotti').update(productData).eq('id', id);
-            error = updateError;
+            const { error } = await supabaseClient.from('prodotti').update(productData).eq('id', id);
+            dbError = error;
         } else {
-            const { error: insertError } = await supabaseClient.from('prodotti').insert([productData]);
-            error = insertError;
+            const { error } = await supabaseClient.from('prodotti').insert([productData]);
+            dbError = error;
         }
-
-        if (error) throw error;
+        if (dbError) throw dbError;
 
         closeModal();
         performSearch();
-
     } catch (error) {
         alert(`Errore durante il salvataggio: ${error.message}`);
     } finally {
@@ -308,8 +278,16 @@ async function fetchProductAndOpenModal(id) {
 
 async function handleDeleteClick(e) {
     const id = e.currentTarget.dataset.id;
-    if (confirm('Sei sicuro di voler eliminare questo prodotto?')) {
+    if (confirm('Sei sicuro di voler eliminare questo prodotto? L\'azione è irreversibile.')) {
         const { data: product } = await supabaseClient.from('prodotti').select('immagine_url, scheda_tecnica_url').eq('id', id).single();
+        
+        const { error } = await supabaseClient.from('prodotti').delete().eq('id', id);
+        
+        if (error) {
+            alert(`Errore durante l'eliminazione del record dal database: ${error.message}`);
+            return;
+        }
+
         if (product) {
             if (product.immagine_url) {
                 const fileName = product.immagine_url.split('/').pop();
@@ -321,12 +299,7 @@ async function handleDeleteClick(e) {
             }
         }
         
-        const { error } = await supabaseClient.from('prodotti').delete().eq('id', id);
-        if (error) {
-            alert(`Errore durante l'eliminazione: ${error.message}`);
-        } else {
-            performSearch();
-        }
+        performSearch();
     }
 }
 
